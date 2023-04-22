@@ -109,9 +109,7 @@ $(document).ready(function(){
 	});
 
     myID = generateID();
-    document.querySelector("#my-id").innerHTML = `
-        <b>My ID:</b>
-        <span>${myID}</span>`;
+    document.querySelector("#my-id").innerHTML = `${myID}`;
     socket.emit("set-id", {uid:myID});
 
 });

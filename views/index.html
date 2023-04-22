@@ -10,31 +10,54 @@
     <script src="/public/js/index.js"></script>
 </head>
 <body>
-	<div class="app">
-		<div class="screen join-screen active">
+	<div class="app-up">
+		<div class="screen join-screen active half-div">
 			<div class="form">
-				<div class="form-input" id="my-id">
-					<b>My ID : </b>
-			        <span></span>
-				</div>
-
-                <div class="form-input" id="room-div">
-					<b>Room ID:</b>
-					<input type="text" id="room-id">
-					<button id="join-room-btn">Join Room</button>
-				</div>
-                
-                <div>
-					<b>Room Info:</b> 
-                    <textarea id="room-info" > </textarea>
-				</div>
-
+                <table border="4" class="showtable">
+                <tr style="white-space:nowrap;">
+                        <td> <b>My ID : </b> </td>
+                        <td> <span id="my-id"></span> </td>
+                </tr>
+                <tr style="white-space:nowrap;">
+                        <td> <b>Room ID:</b> </td>
+                        <td><input type="text" id="room-id"> 
+                        <button id="join-room-btn">Join Room</button> </td>
+                </tr>
+                <tr style="white-space:nowrap;">
+                    <div>
+                        <td> <b>Room Info:</b>  </td>
+                        <td> <textarea id="room-info" > </textarea> </td>
+                    </div>
+                </tr>
+                </table>
 			</div>
 		</div>
 
-        <hr />
+        <div style='width:1px;border:1px solid red;float:left;height:360px;'></div>
 
-		<div class="screen fs-screen active">
+		<div class="message half-div">
+			<div>
+                <table border="4" class="showtable">
+                    <tr style="white-space:nowrap;">
+                            <td> <textarea id="Message" > </textarea> </td>
+                    </tr>
+                    <tr style="white-space:nowrap;">
+                            <td><input type="text" id="send-box"> 
+                            <button id="send-btn"> Send </button> </td>
+                    </tr>
+                    </table>
+                
+                
+                
+            </div>
+		</div>
+
+	</div>
+
+    <hr  style="width:100%; height:2px; border: 1px solid; color: rgb(224, 9, 9);">
+
+    <div class="app-down">
+        <div class="screen fs-screen active half-div">
 			<div class="file-input">
 				<label for="file-input">
 					Click here to Select files for sending
@@ -50,10 +73,9 @@
 			</div>
 		</div>
 
-	</div>
-    <hr size=1000 width="2" style="float:left; color: rgb(193, 18, 18);">
-    <div class="app-right">
-        <div class="screen fs-screen active">
+        <div style='width:1px;border:1px solid red;float:left;height:500px;'></div>
+
+        <div class="screen fs-screen active half-div">
 			<div class="files-list" id="accept-files">
 				<div class="title">Accepted Files:</div>
 			</div>	

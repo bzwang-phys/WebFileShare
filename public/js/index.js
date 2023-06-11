@@ -1,15 +1,17 @@
-//   Client-A         Server        Client-B
-//   file-meta  ->  file-meta  ->   Received
-//   Received   <-  file-ready  <-  file-ready
-//  file-share  ->  file-share ->   Received
-
+//   Client-A         Server                 Client-B
+//   file-meta  ->  转发(file-meta)      ->   Received
+//   Received   <-  转发(file-ready)     <-  file-ready
+//  file-share  ->  转发(file-share)     ->   Received
+//   Received   <-  转发(file-finished)  <-  file-finished
 
 $(document).ready(function(){
 
 	let myID = 0;
     let roomid;
 	const socket = io();
-    let file_accept = {};
+    let sf = {i:0, num:0, data:null, progress_node:null, files:null, metadata:null};
+    let af = {metadata:null, transmitted:0, buffer:null, progrss_node:null};
+    // af:accept_file.   sf:send_file
 
 	function generateID(){
         n = 2;
@@ -19,52 +21,98 @@ $(document).ready(function(){
 		return array.join("-");
 	}
 
+    
+
 	document.querySelector("#join-room-btn").addEventListener("click",function(){
         room_id = document.querySelector("#room-id").value;
 		if(room_id.length == 0 || myID == 0){ return; }
 		socket.emit("join-room", {uid:myID, roomid:room_id});
 	});
 
-    socket.on("join-success", function(data){
-        roomid = data.roomid;
-		document.querySelector("#room-info").innerHTML += `${data.newmember} joined the room:${data.roomid}`;
-	});
-
-	document.querySelector("#file-input").addEventListener("change",function(e){
+	document.querySelector("#file-input").addEventListener("change", function(e){
 		let files = e.target.files;
 		if(files.length == 0){ return; }
-        for (let i = 0; i < files.length; i++) {
-            const file = files[i];
-            let reader = new FileReader();
-            reader.onload = function(e){
-                let buffer = new Uint8Array(reader.result);
-                let ele = document.createElement("div");
-                ele.classList.add("item");
-                ele.innerHTML = `
-                        <div class="progress">0%</div>
-                        <div class="filename">${file.name}</div>
-                `;
-                document.querySelector("#send-files").appendChild(ele);
+        sf.num = files.length;
+        sf.i = 0;
+        sf.files = Array.from(files);
+        console.log("input: "); console.log(sf);
+        sendNewFile();
 
-                file_meta = {
-                    sendid: myID,
-                    roomid: roomid,
-                    filename: file.name,
-                    filesize: buffer.length,
-                    buffersize: 5*1024*1024,
-                };
-                shareFile(file_meta, buffer, ele.querySelector(".progress"));
-            }
-            reader.readAsArrayBuffer(file); 
-        };
+        e.target.value = '';  // then you can chose the same file again.
 	});
- 
+
+    socket.on("join-success", function(data){
+        roomid = data.roomid;
+		document.querySelector("#room-info").innerHTML += `${data.newmember} joined the room:${data.roomid}\n`;
+	});
+    socket.on("join-failed", function(data){
+		alert("There is no room: " + data.roomid);
+    });
+
+
+    // ==========================  Sender  ==========================
+
+    function createFileElement(filename) {
+        const ele = document.createElement("div");
+        ele.classList.add("item");
+        ele.innerHTML = `
+            <div class="progress">0%</div>
+            <div class="filename">${filename}</div>
+        `;
+        return ele;
+    }
+
+    function sendNewFile() {
+        console.log("sendNewFile: "); console.log(sf);
+        const file = sf.files[sf.i];
+        console.log(file);
+        let reader = new FileReader();
+        reader.onload = function(e){
+            sf.data = new Uint8Array(reader.result);
+            let ele = createFileElement(file.name);
+            sf.progress_node = ele.querySelector(".progress");
+            document.querySelector("#send-files").appendChild(ele);
+
+            file_meta = {
+                sendid: myID,
+                roomid: roomid,
+                filename: file.name,
+                filesize: sf.data.length,
+                buffersize: 5*1024*1024,
+            };
+            sf.metadata = file_meta;
+            socket.emit("file-meta", { metadata : file_meta });
+        }
+        reader.readAsArrayBuffer(file); 
+    }
+
+    socket.on("file-ready",function(data){
+        let chunk = sf.data.slice(0, sf.metadata.buffersize);
+        sf.data = sf.data.slice(sf.metadata.buffersize, sf.data.length);
+        sf.progress_node.innerText = Math.trunc(((sf.metadata.filesize - sf.data.length) / sf.metadata.filesize * 100))+"%";
+        if(chunk.length != 0){
+            socket.emit("file-share", {metadata:sf.metadata, buffer:chunk});
+        } else {
+            console.log("Sent file successfully");
+        }
+    });
+
+    socket.on("file-finished", function (data) {
+        if (sf.i < sf.num-1) {
+            sf.i = sf.i + 1;
+            sendNewFile();
+        }
+    })
+
+    // ==========================  End Sender  ==========================
+
+
+    // ==========================  Receiver  ==========================
+
     socket.on("file-meta", function(data){
-        console.log(data.metadata)
-        console.log(data.metadata.filename)
-        file_accept.metadata = data.metadata;
-		file_accept.transmitted = 0;
-		file_accept.buffer = [];
+        af.metadata = data.metadata;
+		af.transmitted = 0;
+		af.buffer = [];
 
 		let el = document.createElement("div");
 		el.classList.add("item");
@@ -74,39 +122,31 @@ $(document).ready(function(){
 		`;
 		document.querySelector("#accept-files").appendChild(el);
 
-		file_accept.progrss_node = el.querySelector(".progress");
+		af.progrss_node = el.querySelector(".progress");
 
 		socket.emit("file-ready", { metadata:data.metadata });
     });
 
-	function shareFile(metadata, buffer, progress_node){
-		socket.emit("file-meta", { metadata : metadata });
-		
-		socket.on("file-ready",function(data){
-			let chunk = buffer.slice(0, metadata.buffersize);
-			buffer = buffer.slice(metadata.buffersize, buffer.length);
-			progress_node.innerText = Math.trunc(((metadata.filesize - buffer.length) / metadata.filesize * 100));
-			console.log(chunk.length);
-            if(chunk.length != 0){
-				socket.emit("file-share", {metadata:metadata, buffer:chunk});
-			} else {
-				console.log("Sent file successfully");
-			}
-		});
-	}
+    
+    socket.on("file-share", function(data){
+		af.buffer.push(data.buffer);
+		af.transmitted += data.buffer.byteLength;
+        let percentage = Math.trunc(af.transmitted/Number(af.metadata.filesize)*100)
+        af.progrss_node.innerText = percentage.toString() + "%";
 
-    socket.on("file-share",function(data){
-		file_accept.buffer.push(data.buffer);
-		file_accept.transmitted += data.buffer.byteLength;
-        let percentage = Math.trunc(file_accept.transmitted / file_accept.metadata.filesize * 100)
-		file_accept.progrss_node.innerText = toString(percentage) + "%";
-		if(file_accept.transmitted == file_accept.metadata.filesize){
-			download(new Blob(file_accept.buffer), file_accept.metadata.filename);
-			file_accept = {};
+		if(af.transmitted == af.metadata.filesize){
+			download(new Blob(af.buffer), af.metadata.filename);
+			af = {};
+            console.log("Download Finished");
+            socket.emit("file-finished", { metadata:data.metadata });
 		} else {
 			socket.emit("file-ready", { metadata:data.metadata });
 		}
 	});
+
+    // ==========================  End Receiver  ==========================
+
+
 
     myID = generateID();
     document.querySelector("#my-id").innerHTML = `${myID}`;

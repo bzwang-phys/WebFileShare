@@ -39,12 +39,17 @@ io.on('connection', (socket)=>{
     })
 
     socket.on("join-room",function(data){
-		socket.join(data.roomid);
-        const roomMembers = io.sockets.adapter.rooms.get(data.roomid);
-        var res = {roomid:data.roomid, members:roomMembers, newmember:data.uid};
-        socket.broadcast.to(data.roomid).emit("join-success", res);
-        socket.emit("join-success", res);
-        // console.log(socket.rooms);
+        let room_id = data.roomid.toString().trim();
+        if (getRooms().includes(room_id))
+        { //if the room exists, then join the room.
+            socket.join(room_id);
+            const roomMembers = io.sockets.adapter.rooms.get(room_id);
+            var res = {roomid:room_id, members:roomMembers, newmember:data.uid};
+            socket.broadcast.to(room_id).emit("join-success", res);
+            socket.emit("join-success", res);
+        } else { // if the room does not exists.
+            socket.emit("join-failed", {roomid:room_id});
+        }
 	});
 
 	socket.on("file-meta",function(data){
@@ -57,6 +62,9 @@ io.on('connection', (socket)=>{
         console.log(data.buffer.length);
 		socket.broadcast.to(data.metadata.roomid).emit("file-share", data);
 	})
+    socket.on("file-finished",function(data){
+		socket.in(data.metadata.sendid).emit("file-finished", data);
+	});
 
 })
 
